@@ -46,15 +46,18 @@ try {
             const rows = rawData.slice(1);
 
             // Encontrar índices de columnas (la primera columna SIEMPRE es referencia)
+            // Posiciones fijas de fallback: Ref(0), Nombre(1), Teléfono(2), Fecha(3), Contactado(4)
             const colIdx = {
                 ref: 0, // Primera columna = referencia SIEMPRE
-                nombre: headers.findIndex(h => /^nombre$/i.test(h)),
-                telefono: headers.findIndex(h => /^tel[eé]fono$/i.test(h)),
-                fecha: headers.findIndex(h => /^fecha$/i.test(h)),
-                contactado: headers.findIndex(h => /^contactad[oa](\/?a)?$/i.test(h)),
+                nombre: Math.max(headers.findIndex(h => /^nombre$/i.test(h)), 1),
+                telefono: Math.max(headers.findIndex(h => /^tel[eé]fono$/i.test(h)), 2),
+                fecha: Math.max(headers.findIndex(h => /^fecha$/i.test(h)), 3),
+                contactado: Math.max(headers.findIndex(h => /^contactad[oa](\/?a)?$/i.test(h)), 4),
                 fechaContacto: headers.findIndex(h => /^fecha\s*contacto$/i.test(h)),
                 obs: headers.findIndex(h => /^observaciones?$/i.test(h)),
             };
+            // Fallback para observaciones: última columna con datos si no se encuentra
+            if (colIdx.obs < 0) colIdx.obs = 7;
 
             const advisorData = {
                 name: sheetName,
