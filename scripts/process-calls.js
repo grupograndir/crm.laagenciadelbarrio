@@ -37,35 +37,62 @@ try {
         .filter(name => !EXCLUDED_SHEETS.includes(name))
         .forEach(sheetName => {
             const sheet = workbook.Sheets[sheetName];
-            const data = xlsx.utils.sheet_to_json(sheet);
+
+            // Leer como array de arrays para capturar SIEMPRE la primera columna
+            const rawData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+            if (rawData.length < 2) return; // Solo header, sin datos
+
+            const headers = rawData[0].map(h => h ? String(h).trim() : '');
+            const rows = rawData.slice(1);
+
+            // Encontrar índices de columnas (la primera columna SIEMPRE es referencia)
+            const colIdx = {
+                ref: 0, // Primera columna = referencia SIEMPRE
+                nombre: headers.findIndex(h => /^nombre$/i.test(h)),
+                telefono: headers.findIndex(h => /^tel[eé]fono$/i.test(h)),
+                fecha: headers.findIndex(h => /^fecha$/i.test(h)),
+                contactado: headers.findIndex(h => /^contactad[oa](\/?a)?$/i.test(h)),
+                fechaContacto: headers.findIndex(h => /^fecha\s*contacto$/i.test(h)),
+                obs: headers.findIndex(h => /^observaciones?$/i.test(h)),
+            };
 
             const advisorData = {
                 name: sheetName,
-                calls: data.map((row, idx) => {
-                    // Normalización de campos según el Excel real
-                    const contactedRaw = (row['Contactado'] || row['No'] || row['Nº'] || '').toString().toLowerCase();
-                    const isContacted = contactedRaw.includes('si') || contactedRaw === 'sí';
-
-                    result.summary.totalCalls++;
-                    if (isContacted) result.summary.contacted++;
-                    else result.summary.notContacted++;
-
-                    // Nombre y teléfono SIN anonimizar (datos reales)
-                    const customerName = row['Nombre'] || row['Cliente'] || 'Sin datos';
-                    const customerPhone = row['Teléfono'] || row['Movil'] || row['Telefono'] || 'Sin datos';
-
-                    return {
-                        id: `${sheetName}-${idx}`,
-                        customer: String(customerName),
-                        phone: String(customerPhone),
-                        date: excelDateToJSDate(row['Fecha'] || row['Fecha alta']),
-                        dateContact: excelDateToJSDate(row['Fecha contacto']),
-                        contacted: isContacted,
-                        obs: row['Observaciones'] || row['__EMPTY'] || row['Observacion'] || '',
-                        ref: row['Referencia'] || row['Inmueble'] || row['Anuncios'] || 'N/A'
-                    };
-                }).filter(c => c.date !== null) // Eliminar filas vacías o sin fecha
+                calls: []
             };
+
+            rows.forEach((row, idx) => {
+                if (!row || row.length === 0) return;
+
+                const fecha = colIdx.fecha >= 0 ? row[colIdx.fecha] : null;
+                const dateStr = excelDateToJSDate(fecha);
+                if (!dateStr) return; // Sin fecha = fila vacía
+
+                const contactedRaw = (colIdx.contactado >= 0 ? String(row[colIdx.contactado] || '') : '').toLowerCase();
+                const isContacted = contactedRaw.includes('si') || contactedRaw === 'sí';
+
+                result.summary.totalCalls++;
+                if (isContacted) result.summary.contacted++;
+                else result.summary.notContacted++;
+
+                const customerName = colIdx.nombre >= 0 ? (row[colIdx.nombre] || 'Sin datos') : 'Sin datos';
+                const customerPhone = colIdx.telefono >= 0 ? (row[colIdx.telefono] || 'Sin datos') : 'Sin datos';
+                const refValue = row[0] || 'N/A'; // Primera columna SIEMPRE
+                const obsValue = colIdx.obs >= 0 ? (row[colIdx.obs] || '') : '';
+
+                advisorData.calls.push({
+                    id: `${sheetName}-${idx}`,
+                    rowIndex: idx, // Para ordenar por posición de fila
+                    customer: String(customerName),
+                    phone: String(customerPhone),
+                    date: dateStr,
+                    dateContact: colIdx.fechaContacto >= 0 ? excelDateToJSDate(row[colIdx.fechaContacto]) : null,
+                    contacted: isContacted,
+                    obs: String(obsValue),
+                    ref: String(refValue)
+                });
+            });
+
             if (advisorData.calls.length > 0) {
                 result.advisors.push(advisorData);
             }

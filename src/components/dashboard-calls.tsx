@@ -97,7 +97,12 @@ export default function DashboardCalls() {
             },
             allCallsForAdvisor: allCalls
                 .filter(c => asesorSel === 'todos' || c.advisorName === asesorSel)
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .sort((a, b) => {
+                    // Ordenar por posición de fila: último registro añadido primero
+                    const idxA = parseInt(a.id.split('-').pop()) || 0;
+                    const idxB = parseInt(b.id.split('-').pop()) || 0;
+                    return idxB - idxA;
+                })
         };
     }, [periodoSel, asesorSel, callsData]);
 
