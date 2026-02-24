@@ -29,6 +29,15 @@ const PERIODOS = [
     { id: 'historico', label: 'Histórico', days: Infinity },
 ];
 
+function parseCustomDate(dateStr: string): Date {
+    if (!dateStr) return new Date(0);
+    const euroMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (euroMatch) {
+        return new Date(`${euroMatch[3]}-${euroMatch[2]}-${euroMatch[1]}T00:00:00`);
+    }
+    return new Date(dateStr);
+}
+
 export default function DashboardCalls() {
     const [periodoSel, setPeriodoSel] = useState('historico');
     const [asesorSel, setAsesorSel] = useState('todos');
@@ -65,7 +74,7 @@ export default function DashboardCalls() {
             .filter((adv: any) => adv.name !== 'Plantilla')
             .forEach((adv: any) => {
                 adv.calls.forEach((call: any) => {
-                    const callDate = new Date(call.date);
+                    const callDate = parseCustomDate(call.date);
                     const isInPeriod = !limitDate || callDate >= limitDate;
 
                     if (isInPeriod) {

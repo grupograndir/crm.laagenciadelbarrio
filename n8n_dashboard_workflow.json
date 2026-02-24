@@ -1,132 +1,131 @@
 {
-    "name": "DASHBOARD LADB - Llamadas Real Time",
-    "nodes": [
-        {
-            "parameters": {
-                "httpMethod": "GET",
-                "path": "ladb-dashboard-data",
-                "responseMode": "responseNode",
-                "options": {
-                    "allowedOrigins": "*"
-                }
-            },
-            "id": "webhook-trigger-001",
-            "name": "Webhook GET",
-            "type": "n8n-nodes-base.webhook",
-            "typeVersion": 2,
-            "position": [
-                250,
-                300
-            ],
-            "webhookId": "ladb-dashboard-data"
-        },
-        {
-            "parameters": {
-                "operation": "read",
-                "documentId": {
-                    "__rl": true,
-                    "mode": "url",
-                    "value": "=PEGA_AQUI_TU_URL_DE_GOOGLE_SHEET"
-                },
-                "sheetName": {
-                    "__rl": true,
-                    "mode": "list",
-                    "value": "gid=0"
-                },
-                "options": {
-                    "returnAllMatches": true
-                }
-            },
-            "id": "google-sheets-001",
-            "name": "Google Sheets - Leer Todas Las Hojas",
-            "type": "n8n-nodes-base.googleSheets",
-            "typeVersion": 4.5,
-            "position": [
-                500,
-                300
-            ],
-            "alwaysOutputData": true,
-            "notes": "IMPORTANTE: Configura manualmente este nodo en n8n. Selecciona tu documento 'Llamadas Contactos IA.' y pon 'Read All Sheets' en las opciones."
-        },
-        {
-            "parameters": {
-                "mode": "runOnceForAllItems",
-                "jsCode": "// DASHBOARD LADB - Procesador de Datos\n// Este código procesa TODAS las filas de Google Sheets\n// y las devuelve en formato JSON para el dashboard.\n\nconst items = $input.all();\nconst EXCLUDED_SHEETS = ['Plantilla'];\n\nconst result = {\n    summary: { totalCalls: 0, contacted: 0, notContacted: 0 },\n    advisors: [],\n    lastUpdated: new Date().toISOString()\n};\n\n// Agrupar por hoja/asesor\nconst advisorsMap = {};\n\nitems.forEach(item => {\n    const row = item.json;\n    // El nombre de la hoja viene como propiedad del item en Google Sheets v4\n    const sheetName = row['_sheet'] || row['__SHEET_NAME__'] || item.json['_sheetName'] || 'General';\n\n    // Excluir hojas no deseadas\n    if (EXCLUDED_SHEETS.includes(sheetName)) return;\n\n    if (!advisorsMap[sheetName]) {\n        advisorsMap[sheetName] = { name: sheetName, calls: [] };\n    }\n\n    const contactedRaw = (row['Contactado'] || row['No'] || row['Nº'] || '').toString().toLowerCase();\n    const isContacted = contactedRaw.includes('si') || contactedRaw === 'sí';\n\n    result.summary.totalCalls++;\n    if (isContacted) result.summary.contacted++;\n    else result.summary.notContacted++;\n\n    // Nombre y teléfono SIN anonimizar\n    const customerName = row['Nombre'] || row['Cliente'] || 'Sin datos';\n    const customerPhone = row['Teléfono'] || row['Movil'] || row['Telefono'] || 'Sin datos';\n\n    advisorsMap[sheetName].calls.push({\n        id: `${sheetName}-${advisorsMap[sheetName].calls.length}`,\n        customer: String(customerName),\n        phone: String(customerPhone),\n        date: row['Fecha'] || row['Fecha alta'] || new Date().toISOString().split('T')[0],\n        contacted: isContacted,\n        obs: row['Observaciones'] || row['Observacion'] || '',\n        ref: row['Referencia'] || row['Inmueble'] || row['Anuncios'] || 'N/A'\n    });\n});\n\nresult.advisors = Object.values(advisorsMap).filter(a => a.calls.length > 0);\nreturn [{ json: result }];"
-            },
-            "id": "code-processor-001",
-            "name": "Procesar Datos",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2,
-            "position": [
-                750,
-                300
-            ]
-        },
-        {
-            "parameters": {
-                "respondWith": "json",
-                "responseBody": "={{ $json }}",
-                "options": {
-                    "responseHeaders": {
-                        "entries": [
-                            {
-                                "name": "Access-Control-Allow-Origin",
-                                "value": "*"
-                            },
-                            {
-                                "name": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ]
-                    }
-                }
-            },
-            "id": "webhook-response-001",
-            "name": "Responder con JSON",
-            "type": "n8n-nodes-base.respondToWebhook",
-            "typeVersion": 1.1,
-            "position": [
-                1000,
-                300
-            ]
+  "name": "DASHBOARD LADB - Lectura Única Maestra (v3)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ladb-dashboard-data",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
         }
-    ],
-    "connections": {
-        "Webhook GET": {
-            "main": [
-                [
-                    {
-                        "node": "Google Sheets - Leer Todas Las Hojas",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Google Sheets - Leer Todas Las Hojas": {
-            "main": [
-                [
-                    {
-                        "node": "Procesar Datos",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Procesar Datos": {
-            "main": [
-                [
-                    {
-                        "node": "Responder con JSON",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        }
+      },
+      "id": "webhook-trigger-001",
+      "name": "Webhook GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ]
     },
-    "settings": {
-        "executionOrder": "v1"
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "TODAS_LAS_LLAMADAS"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "gsheet-master",
+      "name": "Google Sheets - MASTER",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        250,
+        300
+      ],
+      "alwaysOutputData": true,
+      "notes": "Configura tu cuenta y selecciona el documento de Google Sheets (donde esté la pestaña TODAS_LAS_LLAMADAS)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// DASHBOARD LADB - Procesador de Datos de Hoja Maestra centralizada\nconst items = $input.all();\n\nconst result = {\n    summary: { totalCalls: 0, contacted: 0, notContacted: 0 },\n    advisors: [],\n    lastUpdated: new Date().toISOString()\n};\n\nconst advisorsMap = {};\n\nitems.forEach((item, idx) => {\n    const row = item.json;\n    if (Object.keys(row).length === 0) return;\n\n    // Detect headers based on content or keys\n    const kAsesor = Object.keys(row).find(k => /^asesora?$/i.test(k)) || 'Asesor';\n    const kRef = Object.keys(row).find(k => /^ref/i.test(k)) || 'Referencia';\n    const kNombre = Object.keys(row).find(k => /^nombre$|^cliente$/i.test(k)) || 'Nombre';\n    const kTel = Object.keys(row).find(k => /^tel[eé]fono$|^movil$/i.test(k)) || 'Teléfono';\n    const kFecha = Object.keys(row).find(k => /^fecha$/i.test(k)) || 'Fecha';\n    const kContactado = Object.keys(row).find(k => /^contactad[oa](\\/?a)?$|^estado|^visita/i.test(k)) || 'Contactado';\n    const kObs = Object.keys(row).find(k => /^observaciones?$/i.test(k)) || 'Observaciones';\n\n    const advisorName = row[kAsesor] || 'GENERAL';\n    if (!advisorsMap[advisorName]) {\n        advisorsMap[advisorName] = { name: String(advisorName), calls: [] };\n    }\n\n    let dateStr = row[kFecha] || '';\n    if (typeof dateStr === 'number') {\n        const d = new Date((Math.floor(dateStr - 25569) * 86400) * 1000);\n        dateStr = d.toISOString().split('T')[0];\n    } else if (typeof dateStr === 'string' && dateStr.includes('T')) {\n        dateStr = dateStr.split('T')[0];\n    }\n\n    const contactedRaw = String(row[kContactado] || '').toLowerCase();\n    const isContacted = contactedRaw.includes('si') || contactedRaw === 'sí' || contactedRaw.includes('true') || contactedRaw === '1';\n\n    result.summary.totalCalls++;\n    if (isContacted) result.summary.contacted++;\n    else result.summary.notContacted++;\n\n    advisorsMap[advisorName].calls.push({\n        id: advisorName + '-' + idx,\n        customer: String(row[kNombre] || 'Sin datos'),\n        phone: String(row[kTel] || 'Sin datos'),\n        date: dateStr,\n        contacted: isContacted,\n        obs: String(row[kObs] || ''),\n        ref: String(row[kRef] || 'N/A')\n    });\n});\n\nresult.advisors = Object.values(advisorsMap);\nreturn [{ json: result }];\n"
+      },
+      "id": "code-processor-001",
+      "name": "Procesar Datos V3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-response-v3",
+      "name": "Responder con JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        750,
+        300
+      ]
     }
+  ],
+  "connections": {
+    "Webhook GET": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - MASTER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - MASTER": {
+      "main": [
+        [
+          {
+            "node": "Procesar Datos V3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Datos V3": {
+      "main": [
+        [
+          {
+            "node": "Responder con JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
